@@ -1,27 +1,28 @@
 import av
-import numpy as np
 import threading
 import time
+from config.config_loader import Config
+from utils.logger import logger
 
-class VideoStream:
-    def __init__(self, rtsp_url):
-        self.rtsp_url = rtsp_url
+class RTSPStream:
+    def __init__(self):
+        self.rtsp_url = Config.get_rtsp_url()
         self.running = False
         self.frame = None
         self.lock = threading.Lock()
         
-        # Opções avançadas do FFmpeg injetadas diretamente no container
         options = {
-            'rtsp_transport': 'udp',     # Força o UDP, já sabemos que a câmera aceita
-            'flags': 'low_delay',        # Otimiza para tempo real (sem buffer de atraso)
-            'stimeout': '5000000',       # Timeout de 5 segundos em microssegundos
-            'max_delay': '500000'        # Limite de atraso tolerável
+            'rtsp_transport': 'udp',
+            'flags': 'low_delay',
+            'stimeout': '5000000',
+            'max_delay': '500000'
         }
         
-        print("Iniciando negociação PyAV com a câmera...")
+        logger.info(f"Tentando conectar ao stream: {self.rtsp_url}")
         self.container = av.open(self.rtsp_url, options=options)
         self.video_stream = self.container.streams.video[0]
-        self.video_stream.thread_type = 'AUTO' # Habilita decodificação multi-thread
+        self.video_stream.thread_type = 'AUTO'
+        logger.info("Conexão estabelecida com sucesso.")
         
     def start(self):
         self.running = True
@@ -31,7 +32,6 @@ class VideoStream:
         
     def _update(self):
         try:
-            # O demux continua puxando os pacotes da rede
             for packet in self.container.demux(self.video_stream):
                 if not self.running:
                     break
@@ -39,27 +39,22 @@ class VideoStream:
                 if packet.dts is None:
                     continue
                     
-                # Isolamento de falhas: tenta decodificar apenas o pacote atual
                 try:
                     for av_frame in packet.decode():
                         img = av_frame.to_ndarray(format='bgr24')
-                        
                         with self.lock:
                             self.frame = img
                 except Exception:
-                    # Se o frame chegou corrompido (perda de pacotes UDP),
-                    # ignoramos silenciosamente e tentamos ler o próximo.
                     continue
                         
         except Exception as e:
-            print(f"\n[Aviso de Rede] A conexão sofreu interrupção fatal: {e}")
+            logger.error(f"Interrupção na conexão de rede: {e}")
         finally:
             self.running = False
     
     def read(self):
         with self.lock:
             if self.frame is not None:
-                # Retorna o frame copiado para evitar que o PyAV sobrescreva a memória durante o YOLO
                 return True, self.frame.copy()
             return False, None
             

@@ -1,0 +1,35 @@
+{
+  "camera": {
+    "ip": "192.168.1.110",
+    "port": 554,
+    "user": "",
+    "password": "",
+    "main_stream": "onvif1",
+    "sub_stream": "onvif2",
+    "use_substream": false
+  },
+  "ai": {
+    "model_name": "yolo26n.pt",
+    "confidence": 0.45,
+    "device": "cuda"
+  },
+  "analytics": {
+    "strategy": "line",
+    "cooldown_s": 3.0,
+    "max_lost_frames": 30,
+    "geometry": {
+      "line_p1": [1100, 530],
+      "line_p2": [1290, 545],
+      "polygon": [[700, 350], [900, 350], [900, 450], [700, 450]]
+    }
+  },
+  "ui": {
+    "window_name": "Contagem de Fluxo - Analytics",
+    "show_fps": true,
+    "colors": {
+      "line": [0, 255, 255],
+      "bounding_box": [0, 255, 0],
+      "text": [255, 255, 255]
+    }
+  }
+}

@@ -1,19 +1,24 @@
 import time
+from core.analytics.strategy_interface import AnalyticsStrategy
+from config.config_loader import Config
+from utils.logger import logger
 
-class LineCounter:
-    def __init__(self, p1, p2):
-        self.p1 = p1
-        self.p2 = p2
+class LineStrategy(AnalyticsStrategy):
+    def __init__(self):
+        geom = Config.analytics.get("geometry", {})
+        self.p1 = tuple(geom.get("line_p1", [730, 400]))
+        self.p2 = tuple(geom.get("line_p2", [850, 400]))
+        
         self.entradas = 0
         self.saidas = 0
-        
-        # Estrutura unificada: Guarda estado, lado da linha, frames perdidos e log de eventos
         self.track_history = {}
-        self.max_lost_frames = 30
+        self.max_lost_frames = Config.analytics.get("max_lost_frames", 30)
 
-    def update_line(self, p1, p2):
-        self.p1 = p1
-        self.p2 = p2
+    def get_geometry(self):
+        return [self.p1, self.p2]
+
+    def get_stats(self):
+        return self.entradas, self.saidas
 
     def _side_of_line(self, point):
         x, y = point
@@ -41,63 +46,51 @@ class LineCounter:
             if side == 0:
                 continue
 
-            # Novo ID detectado: inicializa o registro
             if track_id not in self.track_history:
                 self.track_history[track_id] = {
-                    "last_side": side,
-                    "logical_state": "DESCONHECIDO", # Pode ser 'DENTRO', 'FORA' ou 'DESCONHECIDO'
-                    "events": [], # Guarda o histórico: [{"tipo": "ENTRADA", "tempo": timestamp}, ...]
-                    "lost_frames": 0
+                    "last_side": side, "logical_state": "DESCONHECIDO",
+                    "events": [], "lost_frames": 0
                 }
                 continue
 
             history = self.track_history[track_id]
             previous_side = history["last_side"]
 
-            # Detectou cruzamento da linha
             if previous_side != side:
-                
-                # Sentido de Entrada
                 if previous_side == -1 and side == 1:
-                    # Só contabiliza se a pessoa não estiver já "DENTRO"
                     if history["logical_state"] != "DENTRO":
                         self.entradas += 1
                         history["logical_state"] = "DENTRO"
                         history["events"].append({"tipo": "ENTRADA", "tempo": now})
-                        print(f"[LOG] ID {track_id} ENTROU na sala.")
+                        logger.info(f"ID {track_id} ENTROU na sala.")
                         
-                # Sentido de Saída
                 elif previous_side == 1 and side == -1:
-                    # Só contabiliza se a pessoa não estiver já "FORA"
                     if history["logical_state"] != "FORA":
                         self.saidas += 1
                         history["logical_state"] = "FORA"
                         history["events"].append({"tipo": "SAIDA", "tempo": now})
                         
-                        # Calcula tempo de permanência baseado no último evento de entrada
-                        entradas_anteriores = [e for e in history["events"] if e["tipo"] == "ENTRADA"]
-                        if entradas_anteriores:
-                            ultima_entrada = entradas_anteriores[-1]["tempo"]
-                            permanencia = now - ultima_entrada
-                            print(f"[LOG] ID {track_id} SAIU. Tempo de permanência: {permanencia:.1f} segundos.")
-                        else:
-                            print(f"[LOG] ID {track_id} SAIU (Entrada não registrada).")
+                        entradas = [e for e in history["events"] if e["tipo"] == "ENTRADA"]
+                        if entradas:
+                            permanencia = now - entradas[-1]["tempo"]
+                            logger.info(f"ID {track_id} SAIU. Permanência: {permanencia:.1f}s.")
 
-                # Atualiza o último lado físico conhecido
                 history["last_side"] = side
-                
-            # Zera o contador de perda de rastro, pois a pessoa foi vista neste frame
             history["lost_frames"] = 0
 
-        # Limpeza de IDs que sumiram definitivamente
         ids_to_remove = []
         for tid, hist in self.track_history.items():
             if tid not in current_ids:
-                hist["lost_frames"] += 1
+                hist["lost_frames"] = hist.get("lost_frames", 0) + 1
                 if hist["lost_frames"] > self.max_lost_frames:
                     ids_to_remove.append(tid)
                     
         for tid in ids_to_remove:
-            # Aqui, futuramente, você pode pegar a lista `self.track_history[tid]["events"]`
-            # e salvar em um banco de dados antes de deletar da memória.
             del self.track_history[tid]
+
+    def set_geometry(self, points):
+        if len(points) >= 2:
+            self.p1 = tuple(points[0])
+            self.p2 = tuple(points[1])
+            logger.info(f"Geometria da Linha atualizada para: {self.p1} -> {self.p2}")
+            # Dica: Em um projeto mais avançado, você pode salvar isso de volta no settings.json aqui.

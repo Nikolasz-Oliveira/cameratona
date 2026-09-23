@@ -1,10 +1,19 @@
-.yolov8n.pt.21deaac7eb34455c8facfea8272ee30a.part
-.yolov8n.pt.21f7896b125048b780ec58eba944f00b.part
-yolov8n.pt
-core/__pycache__/__init__.cpython-314.pyc
-core/__pycache__/business_logic.cpython-314.pyc
-core/__pycache__/config.cpython-314.pyc
-core/__pycache__/detector.cpython-314.pyc
-core/__pycache__/video_stream.cpython-314.pyc
-ui/__pycache__/__init__.cpython-314.pyc
-ui/__pycache__/display.cpython-314.pyc
+# Ambientes virtuais
+venv/
+env/
+
+# Cache do interpretador
+__pycache__/
+*.pyc
+
+# Pesos de modelos de IA (fazem o repositório ficar gigante)
+#*.pt
+*.engine
+*.onnx
+*.part
+
+# Logs locais gerados pelo sistema
+logs/
+
+# Arquivos de configuração da IDE da JetBrains (IntelliJ/CLion)
+.idea/
