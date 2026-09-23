@@ -1,0 +1,8 @@
+{
+    "ip": "192.168.1.110",
+    "port": 554,
+    "user": "",
+    "password": "",
+    "main_stream": "onvif1",
+    "sub_stream": "onvif2"
+}
