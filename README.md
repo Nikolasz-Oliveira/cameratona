@@ -135,6 +135,16 @@ roda `python main.py --headless` do `venv` do projeto e, a cada 5 min, inicia de
 fechado. Erros comuns (ex.: falha da GPU) são tratados pelo próprio programa, que se reinicia
 sozinho em 30 s mantendo os totais.
 
+No dia a dia, use os atalhos em `scripts\windows\` (duplo clique; pedem permissão de administrador):
+
+| Atalho | O que faz |
+|---|---|
+| `iniciar_servico.bat` | ativa e inicia o serviço |
+| `parar_servico.bat` | para de vez (não volta sozinho, nem ao reiniciar o PC) |
+| `status_servico.bat` | mostra o estado e as últimas linhas do log de hoje |
+
+Os mesmos comandos pelo PowerShell:
+
 | Ação | Comando (PowerShell como Administrador) |
 |---|---|
 | Iniciar agora | `Start-ScheduledTask -TaskName Cameratona` |
