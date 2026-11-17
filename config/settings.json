@@ -40,6 +40,7 @@
     "queue_max": 10000
   },
   "ui": {
+    "show_window": true,
     "window_name": "Contagem de Fluxo - Analytics",
     "show_fps": true,
     "colors": {

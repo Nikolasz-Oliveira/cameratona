@@ -83,7 +83,7 @@ class LineStrategyTest(unittest.TestCase):
 
     def test_cooldown_herdado_na_troca_de_id(self):
         self.s.cooldown_s = 3.0
-        with patch("core.analytics.line_strategy.time.time", side_effect=[0, 1, 1.2, 1.5, 2]):
+        with patch("core.analytics.line_strategy._now", side_effect=[0, 1, 1.2, 1.5, 2]):
             self.feed([det(1, 150, 99)], [det(1, 150, 101)])  # entra (t=1)
             self.feed([])
             self.feed([det(2, 150, 99)], [det(2, 150, 101)])  # novo ID tremendo na linha
@@ -91,7 +91,7 @@ class LineStrategyTest(unittest.TestCase):
 
     def test_cooldown_ignora_tremida_na_linha(self):
         self.s.cooldown_s = 3.0
-        with patch("core.analytics.line_strategy.time.time", side_effect=[0, 1, 1.5, 2, 10, 11]):
+        with patch("core.analytics.line_strategy._now", side_effect=[0, 1, 1.5, 2, 10, 11]):
             self.feed([det(1, 150, 99)], [det(1, 150, 101)],   # entra (t=1)
                       [det(1, 150, 99)], [det(1, 150, 101)],   # tremida dentro do cooldown
                       [det(1, 150, 80)])                       # sai de verdade (t=10)
