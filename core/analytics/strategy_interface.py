@@ -19,6 +19,15 @@ class AnalyticsStrategy(ABC):
         """Recebe uma lista de pontos [x, y] do Renderer e atualiza a regra"""
         pass
 
+    # ------------------------------------------------------------------ persistência
+    def export_state(self) -> dict:
+        """Estado a ser salvo em disco (ex.: totais). Padrão: nada."""
+        return {}
+
+    def restore_state(self, state: dict):
+        """Restaura o que export_state() devolveu numa execução anterior."""
+        pass
+
     # ------------------------------------------------------------------ eventos
     # Quem quiser ser avisado de eventos (ex.: envio ao ThingsBoard) se registra
     # aqui. A estratégia não precisa saber para onde os eventos vão.

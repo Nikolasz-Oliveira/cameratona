@@ -1,5 +1,6 @@
 import math
 import time
+from datetime import date
 
 from core.analytics.strategy_interface import AnalyticsStrategy
 from config.config_loader import Config
@@ -9,6 +10,11 @@ from utils.logger import logger
 def _cross(o, a, b):
     """Produto vetorial 2D de (a - o) x (b - o). Sinal indica o lado de b em relação a o->a."""
     return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+
+def _now():
+    """Relógio usado nos eventos (isolado para facilitar testes)."""
+    return time.time()
 
 
 def _sign(v):
@@ -37,8 +43,13 @@ class LineStrategy(AnalyticsStrategy):
         self.segment_margin = float(cfg.get("segment_margin_px", 20))
         self.handover_dist = float(cfg.get("id_handover_max_dist_px", 80))
 
+        # Totais desde a instalação (persistidos em data/estado.json pelo main)
         self.entradas = 0
         self.saidas = 0
+        # Totais do dia (zeram à meia-noite, horário local)
+        self.dia = date.today().isoformat()
+        self.entradas_hoje = 0
+        self.saidas_hoje = 0
         # track_id -> {"last_point", "last_side", "logical_state",
         #              "last_event_time", "entry_time", "lost_frames"}
         self.track_history = {}
@@ -49,6 +60,32 @@ class LineStrategy(AnalyticsStrategy):
 
     def get_stats(self):
         return self.entradas, self.saidas
+
+    def get_daily_stats(self):
+        self._roll_day()
+        return self.entradas_hoje, self.saidas_hoje
+
+    def export_state(self):
+        self._roll_day()
+        return {
+            "entradas": self.entradas,
+            "saidas": self.saidas,
+            "dia": self.dia,
+            "entradas_hoje": self.entradas_hoje,
+            "saidas_hoje": self.saidas_hoje,
+        }
+
+    def restore_state(self, state):
+        if not state:
+            return
+        self.entradas = int(state.get("entradas", 0))
+        self.saidas = int(state.get("saidas", 0))
+        self.dia = state.get("dia", self.dia)
+        self.entradas_hoje = int(state.get("entradas_hoje", 0))
+        self.saidas_hoje = int(state.get("saidas_hoje", 0))
+        self._roll_day()  # se o estado é de outro dia, zera os totais do dia
+        logger.info(f"Totais restaurados: entradas={self.entradas}, saidas={self.saidas} "
+                    f"(hoje: {self.entradas_hoje}/{self.saidas_hoje}).")
 
     def set_geometry(self, points):
         if len(points) >= 2:
@@ -78,7 +115,8 @@ class LineStrategy(AnalyticsStrategy):
         return (int(mx), int(my)), (int(mx + nx * length), int(my + ny * length))
 
     def update(self, detections):
-        now = time.time()
+        now = _now()
+        self._roll_day()
         current_ids = set()
 
         for det in detections:
@@ -122,6 +160,19 @@ class LineStrategy(AnalyticsStrategy):
         self._age_lost_tracks(current_ids)
 
     # ------------------------------------------------------------------ interno
+    def _roll_day(self):
+        hoje = date.today().isoformat()
+        if hoje != self.dia:
+            logger.info(f"Novo dia ({hoje}). Totais de {self.dia}: "
+                        f"entradas={self.entradas_hoje}, saidas={self.saidas_hoje}.")
+            self.dia = hoje
+            self.entradas_hoje = 0
+            self.saidas_hoje = 0
+
+    def _counts(self):
+        return {"entradas": self.entradas, "saidas": self.saidas,
+                "entradas_hoje": self.entradas_hoje, "saidas_hoje": self.saidas_hoje}
+
     def _side_of_line(self, point):
         s = _sign(_cross(self.p1, self.p2, point))
         return -s if self.inverted else s
@@ -151,19 +202,21 @@ class LineStrategy(AnalyticsStrategy):
 
         if prev_side == -1 and side == 1 and history["logical_state"] != "DENTRO":
             self.entradas += 1
+            self.entradas_hoje += 1
             history["logical_state"] = "DENTRO"
             history["last_event_time"] = now
             history["entry_time"] = now
             logger.info(f"ID {track_id} ENTROU.")
             self._emit({"evento": "ENTRADA", "track_id": int(track_id), "ts": now,
-                        "entradas": self.entradas, "saidas": self.saidas})
+                        **self._counts()})
 
         elif prev_side == 1 and side == -1 and history["logical_state"] != "FORA":
             self.saidas += 1
+            self.saidas_hoje += 1
             history["logical_state"] = "FORA"
             history["last_event_time"] = now
             event = {"evento": "SAIDA", "track_id": int(track_id), "ts": now,
-                     "entradas": self.entradas, "saidas": self.saidas}
+                     **self._counts()}
             if history["entry_time"] is not None:
                 permanencia = now - history["entry_time"]
                 event["permanencia_s"] = round(permanencia, 1)

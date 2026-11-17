@@ -30,7 +30,7 @@ class Renderer:
             return geom
         return None
 
-    def draw(self, frame, geometry, entradas, saidas, entry_arrow=None):
+    def draw(self, frame, geometry, entradas, saidas, entry_arrow=None, hoje=None):
         if frame is None:
             return frame
 
@@ -53,8 +53,10 @@ class Renderer:
         self.draw_drawing_overlay(frame)
 
         # Informações de fluxo
-        cv2.putText(frame, f"Entradas: {entradas}", (30, h - 80), cv2.FONT_HERSHEY_SIMPLEX, 1, self.text_color, 2)
-        cv2.putText(frame, f"Saidas: {saidas}", (30, h - 30), cv2.FONT_HERSHEY_SIMPLEX, 1, self.text_color, 2)
+        txt_e = f"Entradas: {entradas}" + (f" (hoje {hoje[0]})" if hoje else "")
+        txt_s = f"Saidas: {saidas}" + (f" (hoje {hoje[1]})" if hoje else "")
+        cv2.putText(frame, txt_e, (30, h - 80), cv2.FONT_HERSHEY_SIMPLEX, 1, self.text_color, 2)
+        cv2.putText(frame, txt_s, (30, h - 30), cv2.FONT_HERSHEY_SIMPLEX, 1, self.text_color, 2)
 
         return frame
 

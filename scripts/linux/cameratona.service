@@ -1,0 +1,25 @@
+# Serviço systemd para Linux (ex.: mini-PC / Jetson na estrada).
+#
+# Instalação (ajuste User e os caminhos):
+#   sudo cp scripts/linux/cameratona.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now cameratona
+#   journalctl -u cameratona -f        # acompanhar (ou logs/ no projeto)
+[Unit]
+Description=Cameratona - contagem de pessoas (envia ao ThingsBoard)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=cameratona
+WorkingDirectory=/opt/cameratona
+ExecStart=/opt/cameratona/venv/bin/python main.py --headless
+Restart=always
+RestartSec=10
+# SIGTERM -> encerramento limpo (salva os totais e esvazia a fila do ThingsBoard)
+KillSignal=SIGTERM
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

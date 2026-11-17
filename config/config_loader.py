@@ -90,6 +90,23 @@ class ConfigLoader:
         """Mesma URL, mas com a senha mascarada (para usar em logs)."""
         return self._build_rtsp_url(mask_password=True)
 
+    def save_local(self, updates: dict):
+        """
+        Mescla 'updates' no config/settings.local.json (criando se preciso) e na
+        configuração em memória. Usado para guardar a linha desenhada com o mouse.
+        """
+        local = {}
+        if self.local_path.exists():
+            with open(self.local_path, "r", encoding="utf-8") as f:
+                local = json.load(f)
+        local = _deep_merge(local, updates)
+
+        tmp = self.local_path.with_suffix(".tmp")
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(local, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, self.local_path)
+        self._config = _deep_merge(self._config, updates)
+
     def resolve_path(self, path):
         """Resolve um caminho relativo à raiz do projeto, se o arquivo existir lá."""
         p = Path(path)
