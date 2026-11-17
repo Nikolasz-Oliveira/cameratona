@@ -155,16 +155,22 @@ class LineStrategy(AnalyticsStrategy):
             history["last_event_time"] = now
             history["entry_time"] = now
             logger.info(f"ID {track_id} ENTROU.")
+            self._emit({"evento": "ENTRADA", "track_id": int(track_id), "ts": now,
+                        "entradas": self.entradas, "saidas": self.saidas})
 
         elif prev_side == 1 and side == -1 and history["logical_state"] != "FORA":
             self.saidas += 1
             history["logical_state"] = "FORA"
             history["last_event_time"] = now
+            event = {"evento": "SAIDA", "track_id": int(track_id), "ts": now,
+                     "entradas": self.entradas, "saidas": self.saidas}
             if history["entry_time"] is not None:
                 permanencia = now - history["entry_time"]
+                event["permanencia_s"] = round(permanencia, 1)
                 logger.info(f"ID {track_id} SAIU. Permanência: {permanencia:.1f}s.")
             else:
                 logger.info(f"ID {track_id} SAIU.")
+            self._emit(event)
 
     def _take_over_lost_track(self, point, current_ids):
         """
