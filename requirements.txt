@@ -6,3 +6,4 @@ lap            # usado pelo tracker BoT-SORT do ultralytics
 av>=10         # PyAV: leitura do stream RTSP
 opencv-python
 numpy
+paho-mqtt>=1.6   # envio de dados ao ThingsBoard (MQTT)

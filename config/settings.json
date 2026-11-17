@@ -30,6 +30,15 @@
       "polygon": [[700, 350], [900, 350], [900, 450], [700, 450]]
     }
   },
+  "thingsboard": {
+    "enabled": true,
+    "host": "thingsboard.labiot",
+    "port": 1883,
+    "access_token": "",
+    "client_id": "cameratona",
+    "summary_interval_s": 10,
+    "queue_max": 10000
+  },
   "ui": {
     "window_name": "Contagem de Fluxo - Analytics",
     "show_fps": true,

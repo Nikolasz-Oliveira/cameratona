@@ -19,6 +19,7 @@ core/
   ai/model_factory.py           # detector YOLO + tracker
   analytics/line_strategy.py    # contagem de entradas/saídas por linha
   analytics/strategy_factory.py # escolhe a estratégia pelo settings.json
+  integrations/thingsboard_client.py # envio de telemetria ao ThingsBoard (MQTT)
 tools/download_models.py        # baixa os pesos .pt
 tests/                          # testes da lógica de contagem
 ```
@@ -46,6 +47,40 @@ Não coloque usuário/senha no `settings.json`. Use uma das opções:
 - **Variáveis de ambiente**: `CAMERATONA_CAM_USER` e `CAMERATONA_CAM_PASSWORD`.
 
 A senha aparece mascarada (`****`) nos logs.
+
+## ThingsBoard (Parquetec)
+
+O Cameratona envia **apenas números e eventos** (nunca imagens) para o ThingsBoard via MQTT
+(`thingsboard.labiot:1883`, rede interna).
+
+1. No ThingsBoard: **Entities → Devices → +** e crie o device (ex.: `Camera-Estrada-01`).
+2. Abra o device → **Copy access token**.
+3. Coloque o token no `config/settings.local.json` (ou na variável `CAMERATONA_TB_TOKEN`):
+   ```json
+   { "thingsboard": { "access_token": "SEU_TOKEN_AQUI" } }
+   ```
+4. Rode `python main.py` e confira no log `ThingsBoard: conectado.` Os dados aparecem na aba
+   **Latest telemetry** do device.
+
+Sem token, o programa roda normalmente e só não envia nada. Se o ThingsBoard ficar fora do ar,
+os dados ficam numa fila em memória (`queue_max`) e são enviados, com o horário original,
+quando a conexão voltar (a fila se perde se o programa for fechado).
+
+**Telemetria** (`v1/devices/me/telemetry`):
+
+| Chave | Quando | Descrição |
+|---|---|---|
+| `evento` | a cada travessia | `ENTRADA` ou `SAIDA` |
+| `track_id` | a cada travessia | ID anônimo do rastreador |
+| `entradas`, `saidas` | travessia e resumo | totais desde que o programa iniciou |
+| `permanencia_s` | saída | segundos desde a entrada do mesmo ID |
+| `pessoas_na_cena` | resumo | pessoas detectadas no último frame |
+| `camera_online`, `ia_pronta`, `fps` | resumo | saúde do sistema |
+
+O resumo é enviado a cada `thingsboard.summary_interval_s` segundos (padrão 10).
+
+**Atributos** (`v1/devices/me/attributes`): `camera_ip`, `modelo_ia`, `estrategia`, `geometria`,
+`direcao_invertida`, enviados ao iniciar e sempre que a linha é redesenhada ou invertida.
 
 ## Executar
 

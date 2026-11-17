@@ -25,7 +25,7 @@ class ConfigLoader:
     Ordem de prioridade (a última vence):
       1. config/settings.json        -> versionado no git, sem segredos
       2. config/settings.local.json  -> opcional, ignorado pelo git (credenciais, IP local...)
-      3. Variáveis de ambiente CAMERATONA_CAM_USER / CAMERATONA_CAM_PASSWORD
+      3. Variáveis de ambiente CAMERATONA_CAM_USER / CAMERATONA_CAM_PASSWORD / CAMERATONA_TB_TOKEN
     """
 
     def __init__(self, config_path=DEFAULT_CONFIG_PATH, local_path=LOCAL_CONFIG_PATH):
@@ -49,6 +49,10 @@ class ConfigLoader:
         if os.environ.get("CAMERATONA_CAM_PASSWORD"):
             cam["password"] = os.environ["CAMERATONA_CAM_PASSWORD"]
 
+        tb = config.setdefault("thingsboard", {})
+        if os.environ.get("CAMERATONA_TB_TOKEN"):
+            tb["access_token"] = os.environ["CAMERATONA_TB_TOKEN"]
+
         return config
 
     @property
@@ -62,6 +66,10 @@ class ConfigLoader:
     @property
     def analytics(self):
         return self._config.get("analytics", {})
+
+    @property
+    def thingsboard(self):
+        return self._config.get("thingsboard", {})
 
     @property
     def ui(self):
