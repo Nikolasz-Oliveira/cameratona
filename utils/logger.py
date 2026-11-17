@@ -1,12 +1,13 @@
 import logging
-import os
 from datetime import datetime
+from pathlib import Path
 
-# Garante que a pasta de logs exista
-os.makedirs("logs", exist_ok=True)
+# Pasta de logs sempre na raiz do projeto, independente de onde o programa é executado
+LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
+LOG_DIR.mkdir(exist_ok=True)
 
 # Define o nome do arquivo baseado no dia atual
-log_filename = datetime.now().strftime("logs/fluxo_%Y-%m-%d.log")
+log_filename = LOG_DIR / datetime.now().strftime("fluxo_%Y-%m-%d.log")
 
 # Configuração base do logger
 logging.basicConfig(

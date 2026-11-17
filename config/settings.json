@@ -6,7 +6,11 @@
     "password": "",
     "main_stream": "onvif1",
     "sub_stream": "onvif2",
-    "use_substream": false
+    "use_substream": false,
+    "transport": "tcp",
+    "timeout_s": 5,
+    "reconnect_delay_s": 3,
+    "no_signal_after_s": 2
   },
   "ai": {
     "model_name": "yolo26n.pt",
@@ -17,6 +21,9 @@
     "strategy": "line",
     "cooldown_s": 3.0,
     "max_lost_frames": 30,
+    "invert_direction": false,
+    "segment_margin_px": 20,
+    "id_handover_max_dist_px": 80,
     "geometry": {
       "line_p1": [1100, 530],
       "line_p2": [1290, 545],

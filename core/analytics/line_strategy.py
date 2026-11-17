@@ -1,96 +1,196 @@
+import math
 import time
+
 from core.analytics.strategy_interface import AnalyticsStrategy
 from config.config_loader import Config
 from utils.logger import logger
 
+
+def _cross(o, a, b):
+    """Produto vetorial 2D de (a - o) x (b - o). Sinal indica o lado de b em relação a o->a."""
+    return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+
+def _sign(v):
+    return 1 if v > 0 else -1 if v < 0 else 0
+
+
 class LineStrategy(AnalyticsStrategy):
+    """
+    Conta entradas e saídas quando o "ponto do pé" de uma pessoa ATRAVESSA o
+    segmento de linha (e não apenas quando muda de lado da reta infinita).
+
+    Convenção de direção: ENTRADA = movimento para o lado indicado pela seta
+    desenhada na tela. Use 'invert_direction' no settings.json (ou a tecla I)
+    para inverter.
+    """
+
     def __init__(self):
-        geom = Config.analytics.get("geometry", {})
+        cfg = Config.analytics
+        geom = cfg.get("geometry", {})
         self.p1 = tuple(geom.get("line_p1", [730, 400]))
         self.p2 = tuple(geom.get("line_p2", [850, 400]))
-        
+
+        self.inverted = bool(cfg.get("invert_direction", False))
+        self.cooldown_s = float(cfg.get("cooldown_s", 3.0))
+        self.max_lost_frames = int(cfg.get("max_lost_frames", 30))
+        self.segment_margin = float(cfg.get("segment_margin_px", 20))
+        self.handover_dist = float(cfg.get("id_handover_max_dist_px", 80))
+
         self.entradas = 0
         self.saidas = 0
+        # track_id -> {"last_point", "last_side", "logical_state",
+        #              "last_event_time", "entry_time", "lost_frames"}
         self.track_history = {}
-        self.max_lost_frames = Config.analytics.get("max_lost_frames", 30)
 
+    # ------------------------------------------------------------------ API pública
     def get_geometry(self):
         return [self.p1, self.p2]
 
     def get_stats(self):
         return self.entradas, self.saidas
 
-    def _side_of_line(self, point):
-        x, y = point
-        value = (self.p2[0] - self.p1[0]) * (y - self.p1[1]) - (self.p2[1] - self.p1[1]) * (x - self.p1[0])
-        return 1 if value > 0 else -1 if value < 0 else 0
+    def set_geometry(self, points):
+        if len(points) >= 2:
+            self.p1 = tuple(points[0])
+            self.p2 = tuple(points[1])
+            # O histórico de lados foi calculado em relação à linha antiga;
+            # reaproveitá-lo geraria contagens falsas.
+            self.track_history.clear()
+            logger.info(f"Geometria da Linha atualizada para: {self.p1} -> {self.p2}")
 
-    def _is_within_segment_bounds(self, x):
-        min_x = min(self.p1[0], self.p2[0]) - 50
-        max_x = max(self.p1[0], self.p2[0]) + 50
-        return min_x <= x <= max_x
+    def toggle_direction(self):
+        self.inverted = not self.inverted
+        self.track_history.clear()
+        logger.info(f"Direção de entrada invertida (invert_direction={self.inverted}).")
+
+    def get_entry_arrow(self, length=40):
+        """Seta (início, fim) a partir do meio da linha apontando para o lado de ENTRADA."""
+        mx = (self.p1[0] + self.p2[0]) / 2
+        my = (self.p1[1] + self.p2[1]) / 2
+        dx = self.p2[0] - self.p1[0]
+        dy = self.p2[1] - self.p1[1]
+        norm = math.hypot(dx, dy) or 1.0
+        # Normal (-dy, dx) aponta para o lado onde _cross(p1, p2, ponto) > 0 (lado +1)
+        nx, ny = -dy / norm, dx / norm
+        if self.inverted:
+            nx, ny = -nx, -ny
+        return (int(mx), int(my)), (int(mx + nx * length), int(my + ny * length))
 
     def update(self, detections):
-        current_ids = set()
         now = time.time()
+        current_ids = set()
 
         for det in detections:
             track_id = det["id"]
             point = det["foot_point"]
             current_ids.add(track_id)
 
-            if not self._is_within_segment_bounds(point[0]):
-                continue
-
             side = self._side_of_line(point)
+
+            if track_id not in self.track_history:
+                inherited = self._take_over_lost_track(point, current_ids)
+                if inherited is not None:
+                    self.track_history[track_id] = inherited
+                else:
+                    self.track_history[track_id] = {
+                        "last_point": None, "last_side": 0,
+                        "logical_state": "DESCONHECIDO",
+                        "last_event_time": None, "entry_time": None,
+                        "lost_frames": 0,
+                    }
+
+            history = self.track_history[track_id]
+            history["lost_frames"] = 0
+
+            # Ponto exatamente sobre a reta: espera o próximo frame para decidir
             if side == 0:
                 continue
 
-            if track_id not in self.track_history:
-                self.track_history[track_id] = {
-                    "last_side": side, "logical_state": "DESCONHECIDO",
-                    "events": [], "lost_frames": 0
-                }
+            prev_point = history["last_point"]
+            prev_side = history["last_side"]
+
+            if prev_point is not None and prev_side != side \
+                    and self._crosses_segment(prev_point, point):
+                self._register_crossing(track_id, history, prev_side, side, now)
+
+            # Sempre atualiza a posição, inclusive fora do segmento: assim quem
+            # contorna a ponta da linha não é contado ao voltar.
+            history["last_point"] = point
+            history["last_side"] = side
+
+        self._age_lost_tracks(current_ids)
+
+    # ------------------------------------------------------------------ interno
+    def _side_of_line(self, point):
+        s = _sign(_cross(self.p1, self.p2, point))
+        return -s if self.inverted else s
+
+    def _extended_segment(self):
+        """Segmento da linha estendido em 'segment_margin' px em cada ponta (tolerância)."""
+        dx = self.p2[0] - self.p1[0]
+        dy = self.p2[1] - self.p1[1]
+        norm = math.hypot(dx, dy) or 1.0
+        ux, uy = dx / norm * self.segment_margin, dy / norm * self.segment_margin
+        return (self.p1[0] - ux, self.p1[1] - uy), (self.p2[0] + ux, self.p2[1] + uy)
+
+    def _crosses_segment(self, a, b):
+        """O deslocamento a->b cruza o segmento da linha (com margem)?"""
+        q1, q2 = self._extended_segment()
+        # a e b já estão em lados opostos da reta (verificado antes); falta saber
+        # se a interseção cai DENTRO do segmento, i.e. q1 e q2 em lados opostos de a->b.
+        d1 = _cross(a, b, q1)
+        d2 = _cross(a, b, q2)
+        return d1 * d2 <= 0
+
+    def _register_crossing(self, track_id, history, prev_side, side, now):
+        # Cooldown: ignora "tremidas" do ponto em cima da linha logo após um evento
+        last = history["last_event_time"]
+        if last is not None and (now - last) < self.cooldown_s:
+            return
+
+        if prev_side == -1 and side == 1 and history["logical_state"] != "DENTRO":
+            self.entradas += 1
+            history["logical_state"] = "DENTRO"
+            history["last_event_time"] = now
+            history["entry_time"] = now
+            logger.info(f"ID {track_id} ENTROU.")
+
+        elif prev_side == 1 and side == -1 and history["logical_state"] != "FORA":
+            self.saidas += 1
+            history["logical_state"] = "FORA"
+            history["last_event_time"] = now
+            if history["entry_time"] is not None:
+                permanencia = now - history["entry_time"]
+                logger.info(f"ID {track_id} SAIU. Permanência: {permanencia:.1f}s.")
+            else:
+                logger.info(f"ID {track_id} SAIU.")
+
+    def _take_over_lost_track(self, point, current_ids):
+        """
+        Quando o tracker troca o ID de uma pessoa, o ID novo aparece perto de onde
+        o antigo sumiu. Herdamos o estado do ID perdido mais próximo para não
+        contar a mesma pessoa duas vezes.
+        """
+        best_id, best_dist = None, self.handover_dist
+        for tid, hist in self.track_history.items():
+            if tid in current_ids or hist["lost_frames"] == 0 or hist["last_point"] is None:
                 continue
+            dist = math.dist(hist["last_point"], point)
+            if dist <= best_dist:
+                best_id, best_dist = tid, dist
 
-            history = self.track_history[track_id]
-            previous_side = history["last_side"]
+        if best_id is None:
+            return None
+        logger.debug(f"Novo ID herdou o estado do ID perdido {best_id} ({best_dist:.0f}px).")
+        return self.track_history.pop(best_id)
 
-            if previous_side != side:
-                if previous_side == -1 and side == 1:
-                    if history["logical_state"] != "DENTRO":
-                        self.entradas += 1
-                        history["logical_state"] = "DENTRO"
-                        history["events"].append({"tipo": "ENTRADA", "tempo": now})
-                        logger.info(f"ID {track_id} ENTROU na sala.")
-                        
-                elif previous_side == 1 and side == -1:
-                    if history["logical_state"] != "FORA":
-                        self.saidas += 1
-                        history["logical_state"] = "FORA"
-                        history["events"].append({"tipo": "SAIDA", "tempo": now})
-                        
-                        entradas = [e for e in history["events"] if e["tipo"] == "ENTRADA"]
-                        if entradas:
-                            permanencia = now - entradas[-1]["tempo"]
-                            logger.info(f"ID {track_id} SAIU. Permanência: {permanencia:.1f}s.")
-
-                history["last_side"] = side
-            history["lost_frames"] = 0
-
+    def _age_lost_tracks(self, current_ids):
         ids_to_remove = []
         for tid, hist in self.track_history.items():
             if tid not in current_ids:
-                hist["lost_frames"] = hist.get("lost_frames", 0) + 1
+                hist["lost_frames"] += 1
                 if hist["lost_frames"] > self.max_lost_frames:
                     ids_to_remove.append(tid)
-                    
         for tid in ids_to_remove:
             del self.track_history[tid]
-
-    def set_geometry(self, points):
-        if len(points) >= 2:
-            self.p1 = tuple(points[0])
-            self.p2 = tuple(points[1])
-            logger.info(f"Geometria da Linha atualizada para: {self.p1} -> {self.p2}")
-            # Dica: Em um projeto mais avançado, você pode salvar isso de volta no settings.json aqui.
