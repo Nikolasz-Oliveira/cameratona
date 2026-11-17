@@ -25,10 +25,10 @@ class RTSPStream:
         self.timeout_s = float(cam.get("timeout_s", 5))
         self.reconnect_delay_s = float(cam.get("reconnect_delay_s", 3))
 
-        # 'tcp' é mais estável (sem perda de pacotes / imagem borrada);
-        # 'udp' tem latência um pouco menor em redes muito boas.
+        # 'udp' é o padrão: câmeras tipo Yoosee (caminho onvif1/onvif2) só aceitam UDP.
+        # Em câmeras que suportam, 'tcp' é mais estável (sem perda de pacotes).
         self.options = {
-            "rtsp_transport": cam.get("transport", "tcp"),
+            "rtsp_transport": cam.get("transport", "udp"),
             "fflags": "nobuffer",
             "flags": "low_delay",
             "max_delay": "500000",

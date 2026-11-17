@@ -69,7 +69,7 @@ Para fixar o sentido, use `analytics.invert_direction` no `settings.json`.
 
 | Chave | Descrição |
 |---|---|
-| `camera.transport` | `tcp` (padrão, mais estável) ou `udp` |
+| `camera.transport` | `udp` (padrão; câmeras com caminho `onvif1`/`onvif2`, tipo Yoosee, só aceitam UDP) ou `tcp` (mais estável em câmeras que suportam) |
 | `camera.timeout_s` / `reconnect_delay_s` | timeout da conexão e espera entre reconexões |
 | `camera.no_signal_after_s` | segundos sem frame até mostrar "Sem sinal" |
 | `analytics.strategy` | estratégia de análise (`line`) |
