@@ -8,7 +8,8 @@ from utils.logger import logger
 class YoloStandardDetector(BaseDetector):
     def __init__(self):
         ai_config = Config.ai
-        model_path = ai_config.get("model_name", "yolov8n.pt")
+        # Resolve o caminho relativo à raiz do projeto (funciona fora da pasta do projeto)
+        model_path = Config.resolve_path(ai_config.get("model_name", "yolov8n.pt"))
         self.conf_threshold = ai_config.get("confidence", 0.45)
         
         # Override para device configurado no JSON ou auto-detect

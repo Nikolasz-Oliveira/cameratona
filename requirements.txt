@@ -1,0 +1,8 @@
+# PyTorch: para usar GPU (CUDA), instale ANTES seguindo https://pytorch.org/get-started/locally/
+# (o pip padrão pode instalar a versão só-CPU).
+torch
+ultralytics>=8.3
+lap            # usado pelo tracker BoT-SORT do ultralytics
+av>=10         # PyAV: leitura do stream RTSP
+opencv-python
+numpy
