@@ -51,7 +51,7 @@ A senha aparece mascarada (`****`) nos logs.
 ## ThingsBoard (Parquetec)
 
 O Cameratona envia **apenas números e eventos** (nunca imagens) para o ThingsBoard via MQTT
-(`thingsboard.labiot:1883`, rede interna).
+(`192.168.1.119:1883`, rede interna).
 
 1. No ThingsBoard: **Entities → Devices → +** e crie o device (ex.: `Camera-Estrada-01`).
 2. Abra o device → **Copy access token**.

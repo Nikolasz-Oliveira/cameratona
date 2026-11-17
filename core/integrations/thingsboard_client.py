@@ -190,7 +190,7 @@ def create_thingsboard_client():
         return NullThingsBoardClient()
 
     return ThingsBoardClient(
-        host=cfg.get("host", "thingsboard.labiot"),
+        host=cfg.get("host", "192.168.1.119"),
         port=cfg.get("port", 1883),
         access_token=token,
         client_id=cfg.get("client_id", "cameratona"),

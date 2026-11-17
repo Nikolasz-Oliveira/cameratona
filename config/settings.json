@@ -32,7 +32,7 @@
   },
   "thingsboard": {
     "enabled": true,
-    "host": "thingsboard.labiot",
+    "host": "192.168.1.119",
     "port": 1883,
     "access_token": "",
     "client_id": "cameratona",
