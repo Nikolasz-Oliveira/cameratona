@@ -23,7 +23,7 @@ class StateStore:
             logger.info(f"Nenhum estado salvo em {self.path}. Começando do zero.")
             return {}
         try:
-            with open(self.path, "r", encoding="utf-8") as f:
+            with open(self.path, "r", encoding="utf-8-sig") as f:
                 state = json.load(f)
             logger.info(f"Estado restaurado de {self.path}.")
             return state
